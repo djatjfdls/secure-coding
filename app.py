@@ -8,7 +8,6 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_socketio import SocketIO, send, emit, join_room
 from functools import wraps
 from datetime import datetime, timedelta
-from werkzeug.utils import secure_filename
 
 # 로그인 시도 제한을 위한 변수
 MAX_LOGIN_ATTEMPTS = 5
@@ -19,12 +18,6 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins='*')
 DATABASE = 'market.db'
 
-# 이미지 업로드 설정
-UPLOAD_FOLDER = 'static/uploads'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 # DB 연결
 def get_db():
     db = getattr(g, '_database', None)
@@ -32,7 +25,6 @@ def get_db():
         db = g._database = sqlite3.connect(DATABASE)
         db.row_factory = sqlite3.Row
     return db
-
 
 @app.teardown_appcontext
 def close_connection(exception):
@@ -68,8 +60,7 @@ def init_db():
                 title TEXT NOT NULL,
                 description TEXT NOT NULL,
                 price TEXT NOT NULL,
-                seller_id TEXT NOT NULL,
-                image_path TEXT
+                seller_id TEXT NOT NULL
             )
         """)
 
@@ -132,7 +123,6 @@ def register():
 
     return render_template('register.html')
 
-
 # 로그인
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -146,6 +136,11 @@ def login():
         user = cursor.fetchone()
 
         if user:
+            # 휴면 계정 체크
+            if user['is_active'] == 0:
+                flash('휴면 계정입니다. 관리자에게 문의하세요.')
+                return redirect(url_for('login'))
+
             # 로그인 시도 제한 체크
             if user['login_attempts'] >= MAX_LOGIN_ATTEMPTS:
                 last_attempt = datetime.strptime(user['last_login_attempt'], "%Y-%m-%d %H:%M:%S")
@@ -175,8 +170,6 @@ def login():
             return redirect(url_for('login'))
 
     return render_template('login.html')
-
-
 
 # 로그아웃
 @app.route('/logout')
@@ -228,10 +221,6 @@ def change_password():
     flash('비밀번호가 변경되었습니다.')
     return redirect(url_for('profile'))
 
-# 파일 확장자 체크
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 #[상품+신고 기능]
 # 상품 등록
 @app.route('/product/new', methods=['GET', 'POST'])
@@ -244,34 +233,20 @@ def new_product():
         description = request.form['description'].strip()
         price = request.form['price'].strip()
 
-        # 파일 처리
-        file = request.files['image']
-        if file and file.filename != '' and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)  # 파일 저장
-
-            # 이미지 경로를 product.image_path에 반영
-            image_path = os.path.join('uploads', filename)  # 'uploads/filename' 형식
-        else:
-            flash("허용되지 않는 파일 형식입니다.")
-            return redirect(url_for('new_product'))
-
-        # 데이터베이스에 상품 저장
+        # 상품 등록 (이미지 관련 부분 제거)
         db = get_db()
         cursor = db.cursor()
         product_id = str(uuid.uuid4())
         cursor.execute(
-            "INSERT INTO product (id, title, description, price, seller_id, image_path) VALUES (?, ?, ?, ?, ?, ?)",
-            (product_id, title, description, price, session['user_id'], image_path)
+            "INSERT INTO product (id, title, description, price, seller_id) VALUES (?, ?, ?, ?, ?)",
+            (product_id, title, description, price, session['user_id'])
         )
         db.commit()
+
         flash('상품이 등록되었습니다.')
-        return redirect(url_for('dashboard'))
+        return redirect(url_for('dashboard'))  # 대시보드로 리다이렉트
 
-    return render_template('new_product.html')
-
-
+    return render_template('new_product.html')  # GET 요청 시 상품 등록 페이지를 반환
 
 # 상품 목록 (대시보드)
 @app.route('/dashboard')
@@ -329,22 +304,6 @@ def edit_product(product_id):
         title = request.form['title']
         description = request.form['description']
         price = request.form['price']
-
-        # 파일 처리 (새로운 이미지가 업로드된 경우)
-        file = request.files['image']
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = filename 
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
-
-            # 기존 이미지 경로를 새 파일 경로로 업데이트
-            cursor.execute("UPDATE product SET title = ?, description = ?, price = ?, image_path = ? WHERE id = ?",
-                           (title, description, price, filename, product_id))
-        else:
-            # 이미지가 변경되지 않으면 기존 값 유지
-            cursor.execute("UPDATE product SET title = ?, description = ?, price = ? WHERE id = ?",
-                           (title, description, price, product_id))
 
         db.commit()
         flash("상품이 수정되었습니다.")
@@ -451,15 +410,34 @@ def admin_required(f):
 def admin_dashboard():
     return render_template('admin/admin_dashboard.html')
 
-# 관리자 - 전체 사용자 목록
-@app.route('/admin/users')
+# 관리자 유저 관리 페이지 (금액 추가 처리)
+@app.route('/admin/users', methods=['GET', 'POST'])
 @admin_required
 def admin_users():
     db = get_db()
     cursor = db.cursor()
+    
+    if request.method == 'POST':
+        user_id = request.form.get('user_id')  # user_id를 받음 (None이면 KeyError 피함)
+        amount = request.form.get('amount')  # 금액을 받음
+
+        if user_id and amount:
+            try:
+                amount = int(amount)  # 금액을 정수로 변환
+                cursor.execute("UPDATE user SET balance = balance + ? WHERE id = ?", (amount, user_id))
+                db.commit()
+                flash(f'{amount} 원이 추가되었습니다.')
+            except ValueError:
+                flash("금액은 숫자여야 합니다.")
+        else:
+            flash("잘못된 요청입니다.")
+        
+        return redirect(url_for('admin_users'))  # 금액 추가 후 유저 목록 페이지로 리다이렉트
+
     cursor.execute("SELECT * FROM user")
     users = cursor.fetchall()
     return render_template('admin/admin_users.html', users=users)
+
 
 # 관리자 - 유저 삭제
 @app.route('/admin/users/delete/<user_id>', methods=['POST'])
@@ -473,6 +451,7 @@ def admin_delete_user(user_id):
     return redirect(url_for('admin_users'))
 
 # 관리자 - 휴면 전환
+# 관리자 - 휴면 전환
 @app.route('/admin/users/deactivate/<user_id>', methods=['POST'])
 @admin_required
 def deactivate_user(user_id):
@@ -482,6 +461,7 @@ def deactivate_user(user_id):
     db.commit()
     flash("유저를 휴면 계정으로 전환했습니다.")
     return redirect(url_for('admin_users'))
+
 
 # 관리자 - 상품 목록
 @app.route('/admin/products')
@@ -729,9 +709,18 @@ def inject_user_balance():
         cursor = db.cursor()
         cursor.execute("SELECT balance FROM user WHERE id = ?", (session['user_id'],))
         user = cursor.fetchone()
-        if user:
+        
+        # user가 None일 경우 user_balance를 0으로 설정
+        if user is not None:
             return dict(user_balance=user['balance'])
-    return dict(user_balance=None)
+        else:
+            # 사용자 정보가 없을 경우 0 반환
+            return dict(user_balance=0)
+
+    # 로그인하지 않은 경우 0 반환
+    return dict(user_balance=0)
+
+        
 
 # ✅ 앱 실행
 if __name__ == '__main__':
