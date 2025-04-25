@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}유저 관리{% endblock %}
+{% block content %}
+<h2>전체 유저 목록</h2>
+<ul>
+  {% for user in users %}
+    <li>
+      {{ user.username }} (ID: {{ user.id }})
+      {% if not user.is_admin %}
+      <form action="{{ url_for('admin_delete_user', user_id=user.id) }}" method="post" style="display:inline;">
+        <button type="submit" onclick="return confirm('정말 삭제하시겠습니까?')">강제 탈퇴</button>
+      </form>
+      
+      <form action="{{ url_for('admin_users', user_id=user.id) }}" method="post">
+          <input type="number" name="amount" placeholder="금액" required>
+          <button type="submit">금액 추가</button>
+      </form>
+    
+        
+      {% else %}
+        [관리자]
+      {% endif %}
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}

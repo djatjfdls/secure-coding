@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}신고된 사용자 목록{% endblock %}
+{% block content %}
+<h2>신고된 사용자 목록</h2>
+<ul>
+  {% for report in reports %}
+    <li>
+      신고 대상자: {{ report.reported_username }}<br>
+      사유: {{ report.reason }}<br>
+      <form action="{{ url_for('deactivate_user', user_id=report.target_id) }}" method="post">
+        <button type="submit" onclick="return confirm('이 유저를 휴면 처리하시겠습니까?')">휴면 전환</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}

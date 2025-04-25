@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}사용자 목록{% endblock %}
+
+{% block content %}
+<h2>사용자 목록</h2>
+<form method="get">
+  <input type="text" name="query" value="{{ query }}" placeholder="검색어 입력">
+  <button type="submit">검색</button>
+</form>
+
+<style>
+  .user-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 10px 0;
+  }
+
+  .user-info {
+    font-size: 16px;
+    flex-grow: 1;
+  }
+
+  .chat-button {
+    width: 80px;               /* ✅ 가로 길이 강제 고정 */
+    padding: 6px 0;            /* 위아래 패딩만 */
+    font-size: 13px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .chat-button:hover {
+    background-color: #0056b3;
+  }
+</style>
+
+
+
+<ul>
+  {% for u in users %}
+    {% if u.id != current_user.id %}
+      <li class="user-item">
+        <div class="user-info">
+          <strong>{{ u.username }}</strong> - {{ u.bio or '소개글 없음' }}
+        </div>
+        <button class="chat-button" onclick="joinRoom('{{ u.id }}', '{{ u.username }}')">채팅 시작</button>
+      </li>
+    {% endif %}
+  {% endfor %}
+</ul>
+
+<!-- ✅ 실시간 채팅창은 페이지 하단에 하나만 위치 -->
+<div id="chat_box" style="display:none;">
+  <h3><span id="chat_target"></span> 님과의 채팅</h3>
+  <ul id="messages"></ul>
+  <input id="chat_input" type="text" placeholder="메시지를 입력하세요">
+  <button onclick="sendPrivateMessage()">전송</button>
+</div>
+
+<script>
+  let currentRoom = null;
+  let currentUser = "{{ session['user_id'] }}";
+  let currentUsername = "{{ current_user_name }}";
+
+  // let currentUsername = "{{ current_user['username'] if current_user else '' }}";
+
+  function joinRoom(targetId, targetUsername) {
+    currentTargetId = targetId;  // 👈 이 줄 추가
+    currentRoom = [currentUser, targetId].sort().join('-');
+    document.getElementById('chat_target').innerText = targetUsername;
+    document.getElementById('chat_box').style.display = 'block';
+    document.getElementById('messages').innerHTML = '';
+
+    socket.emit('join_room', {
+      room: currentRoom,
+      username: currentUsername
+    });
+
+    const saved = JSON.parse(localStorage.getItem('chat_' + currentRoom)) || [];
+    saved.forEach((m) => appendMessage(m.username, m.message));
+  }
+
+  function sendPrivateMessage() {
+    const msg = document.getElementById('chat_input').value;
+    if (!msg || !currentRoom) return;
+
+    const data = {
+      room: currentRoom,
+      username: currentUsername,
+      message: msg,
+      target_id: currentTargetId
+    };
+
+    socket.emit('private_message', data);
+    document.getElementById('chat_input').value = '';
+  }
+
+  function appendMessage(username, message) {
+    const li = document.createElement('li');
+    li.textContent = `${username}: ${message}`;
+    document.getElementById('messages').appendChild(li);
+  }
+
+  function saveMessage(data) {
+    let logs = JSON.parse(localStorage.getItem('chat_' + data.room)) || [];
+    logs.push({ username: data.username, message: data.message });
+    localStorage.setItem('chat_' + data.room, JSON.stringify(logs));
+  }
+
+  
+</script>
+<script>
+  socket.on('receive_private_message', function(data) {
+    if (data.room === currentRoom) {
+      saveMessage(data);
+      appendMessage(data.username, data.message);
+    } else {
+      alert(`${data.username} 님이 메시지를 보냈습니다: ${data.message}`);
+    }
+  });
+</script>
+
+{% endblock %}

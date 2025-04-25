@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}신고 관리{% endblock %}
+{% block content %}
+<h2>신고 목록 관리</h2>
+
+<!-- 탭 버튼 -->
+<div style="margin-bottom: 20px;">
+  <a href="{{ url_for('admin_reported_products') }}">🔧 신고된 상품 보기</a> |
+  <a href="{{ url_for('admin_reported_users') }}">🙍 신고된 계정 보기</a>
+</div>
+
+<!-- 여기에 선택된 탭에 따라 include 또는 iframe 등으로 다른 템플릿 삽입 -->
+{% block report_content %}
+<p>카테고리를 선택해주세요.</p>
+{% endblock %}
+
+{% endblock %}

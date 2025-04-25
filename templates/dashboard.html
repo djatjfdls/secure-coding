@@ -2,6 +2,28 @@
 {% block title %}대시보드{% endblock %}
 {% block content %}
 <h2>대시보드</h2>
+<form method="get" action="{{ url_for('dashboard') }}" style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+  <label for="query" style="font-size: 16px; white-space: nowrap;">상품 검색:</label>
+  <input type="text" name="query" id="query" value="{{ query or '' }}" required 
+         style="width: 250px; height: 36px; padding: 5px 10px; font-size: 14px;">
+  <button type="submit" style="
+    height: 36px;
+    width: 36px;
+    padding: 0;
+    font-size: 16px;
+    background-color: #007AFF;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  " title="검색">🔍</button>
+</form>
+
+
+<!-- ✅ 검색 결과 없을 때 팝업 알림 -->
+{% if query and products|length == 0 %}
+  <script>alert("검색 결과가 없습니다.");</script>
+{% endif %}
 <h3>등록된 상품</h3>
 <ul>
   {% for product in products %}
@@ -17,28 +39,36 @@
 <div id="chat">
   <ul id="messages"></ul>
   <input id="chat_input" type="text" placeholder="메시지를 입력하세요">
-  <button onclick="sendMessage()">전송</button>
+  <button type="button" onclick="sendMessage()">전송</button>
 </div>
 
 <script type="text/javascript">
-  var socket = io();
-  socket.on('connect', function() {
+  // 소켓 연결 변수명 변경
+  var socketClient = io();
+
+  // 소켓 연결 확인
+  socketClient.on('connect', function() {
     console.log("채팅 서버에 연결됨");
   });
-  socket.on('message', function(data) {
+
+  // 메시지 수신
+  socketClient.on('message', function(data) {
     var messages = document.getElementById('messages');
     var item = document.createElement('li');
     item.textContent = data.username + ": " + data.message;
     messages.appendChild(item);
     window.scrollTo(0, document.body.scrollHeight);
   });
+
+  // 메시지 전송 함수
   function sendMessage() {
     var input = document.getElementById('chat_input');
     var message = input.value;
     if (message) {
-      socket.emit('send_message', { 'username': "{{ user.username }}", 'message': message });
+      socketClient.emit('send_message', { 'username': "{{ user.username }}", 'message': message });
       input.value = "";
     }
   }
 </script>
+
 {% endblock %}

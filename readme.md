@@ -25,4 +25,12 @@ if you want to test on external machine, you can utilize the ngrok to forwarding
 # optional
 sudo snap install ngrok
 ngrok http 5000
+
+```
+```
+# optional2
+pip install bcrypt
+pip install flask-limiter
+pip install flask_socketio
+
 ```

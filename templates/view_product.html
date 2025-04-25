@@ -5,4 +5,37 @@
 <p>{{ product.description }}</p>
 <p>가격: {{ product.price }}</p>
 <p>판매자: {{ seller.username if seller else '알 수 없음' }}</p>
+
+<!-- 상품 사진 출력 -->
+<p>이미지 경로: {{ product.image_path }}</p> 
+{% if product.image_path %}
+  {% set image_path = product.image_path %}
+  {% if image_path.startswith('uploads/') %}
+    <img src="{{ url_for('static', filename=image_path) }}" alt="상품 사진" width="300">
+  {% else %}
+    <img src="{{ url_for('static', filename='uploads/' + image_path) }}" alt="상품 사진" width="300">
+  {% endif %}
+
+{% else %}
+  <p>상품 사진이 없습니다.</p>
+{% endif %}
+
+<br><br>
+{% if user and user['id'] == product['seller_id'] %}
+  <a href="{{ url_for('edit_product', product_id=product['id']) }}">상품 수정</a>
+  <form action="{{ url_for('delete_my_product', product_id=product['id']) }}" method="post">
+    <button type="submit" onclick="return confirm('정말 삭제하시겠습니까?')">상품 삭제</button>
+  </form>
+{% endif %}
+
+{% if user and user.id != product.seller_id %}
+<form method="post" action="{{ url_for('purchase_product', product_id=product.id) }}">
+  <button type="submit" onclick="return confirm('이 상품을 구매하시겠습니까?')">구매하기</button>
+</form>
+{% endif %}
+
+<form action="{{ url_for('report_product', product_id=product.id) }}" method="post">
+  <input type="text" name="reason" placeholder="신고 사유 입력" required>
+  <button type="submit">불량 신고</button>
+</form>
 {% endblock %}

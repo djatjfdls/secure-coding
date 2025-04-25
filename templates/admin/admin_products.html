@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}상품 관리{% endblock %}
+
+{% block content %}
+<h2>전체 상품 목록</h2>
+<ul>
+  {% for product in products %}
+    <li>
+      {{ product.title }} (ID: {{ product.id }})
+      <form action="{{ url_for('admin_delete_product', product_id=product.id) }}" method="post" style="display:inline;">
+        <button type="submit" onclick="return confirm('정말 삭제하시겠습니까?')">삭제</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -5,6 +5,40 @@
   <title>{% block title %}My Market{% endblock %}</title>
   <!-- Socket.IO 클라이언트 라이브러리 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
+  <style>
+    .user-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 10px 0;
+    }
+  
+    .user-info {
+      font-size: 16px;
+      flex-grow: 1;
+    }
+  
+    .chat-button {
+      width: 80px;               /* ✅ 가로 길이 강제 고정 */
+      padding: 6px 0;            /* 위아래 패딩만 */
+      font-size: 13px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+    }
+  
+    .chat-button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+  
+
   <style>
     /* Notion 스타일 미니멀 디자인 */
     body {
@@ -84,19 +118,49 @@
       background-color: #fafafa;
     }
   </style>
+
+  <script>
+    const socket = io();  // 소켓 연결
+
+    socket.on("connect", () => {
+      const currentUserId = "{{ session['user_id'] }}";
+      document.addEventListener('DOMContentLoaded', function () {
+        if (currentUserId) {
+          socket.emit('join_user_room', { user_id: currentUserId });
+        }
+      });
+
+    });
+
+  
+  </script>
+
+
+  
 </head>
 <body>
   <nav>
     {% if session.get('user_id') %}
       <a href="{{ url_for('dashboard') }}">대시보드</a>
+      {% if session.get('is_admin') %}
+        <a href="{{ url_for('admin_panel') }}">관리자</a>
+      {% endif %}
       <a href="{{ url_for('profile') }}">프로필</a>
       <a href="{{ url_for('report') }}">신고하기</a>
+      <a href="{{ url_for('user_list') }}">사용자 목록</a>
       <a href="{{ url_for('logout') }}">로그아웃</a>
+  
+      <!-- 💰 현재 금액 표시 -->
+      <span style="float: right; font-weight: bold; color: #007AFF;">
+        잔액: {{ user_balance if user_balance is not none else "조회 불가" }} 원
+      </span>
+      
     {% else %}
       <a href="{{ url_for('login') }}">로그인</a>
       <a href="{{ url_for('register') }}">회원가입</a>
     {% endif %}
   </nav>
+  
   <div class="container">
     {% with messages = get_flashed_messages() %}
       {% if messages %}

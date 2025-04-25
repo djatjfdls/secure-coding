@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}신고된 상품 목록{% endblock %}
+{% block content %}
+<h2>신고된 상품 목록</h2>
+<ul>
+  {% for r in reports %}
+    <li>
+      신고 상품: {{ r.title }} (ID: {{ r.target_id }})  
+      사유: {{ r.reason }}
+      
+      <!-- 상품 삭제 -->
+      <form action="{{ url_for('delete_product_admin', product_id=r.target_id) }}" method="post" style="display:inline;">
+        <button type="submit" onclick="return confirm('정말 삭제하시겠습니까?')">상품 삭제</button>
+      </form>
+
+      <!-- 판매자 휴면 전환 -->
+      <form action="{{ url_for('deactivate_user', user_id=r.seller_id) }}" method="post" style="display:inline;">
+        <button type="submit">판매자 휴면 전환</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}
